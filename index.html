@@ -177,7 +177,7 @@ ul.log li span{color:var(--muted);text-align:right}
 .dayb.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .tabs button{font-size:14px}
 .seg.lv{flex-wrap:wrap}.seg.lv button{flex:1 1 28%}
-.tabs button{font-size:12.5px;padding:12px 1px}
+.tabs button{font-size:12px;padding:12px 0}
 .srows{margin-top:10px;display:flex;flex-direction:column;gap:8px}
 .srow{display:flex;align-items:center;gap:6px;padding:8px 6px;border-radius:12px;border:1px solid var(--line);background:var(--bg)}
 .srow.ok{border-color:var(--ok)}
@@ -197,7 +197,8 @@ ul.log li span{color:var(--muted);text-align:right}
 <nav class="tabs" aria-label="Navigation">
   <button id="t-train" onclick="go('train')">Maison</button>
   <button id="t-gym" onclick="go('gym')">Salle</button>
-  <button id="t-cali" onclick="go('cali')">Calisthénie</button>
+  <button id="t-cali" onclick="go('cali')">Calis</button>
+  <button id="t-str" onclick="go('str')">Étirer</button>
   <button id="t-track" onclick="go('track')">Suivi</button>
   <button id="t-set" onclick="go('set')">Plus</button>
 </nav>
@@ -682,6 +683,21 @@ function drawFlag(P,d,ts,layer){
   return layer==='fg'?s:bg+s;
 }
 
+/* ---------- étirements matin et soir : poses ---------- */
+PROP.wallr='<rect x="222" y="14" width="17" height="178" fill="#d5dbe6" stroke="#a9b3c4" stroke-width="2"/>';
+Object.assign(EXD,{
+ etfente:{T:4400,k:[PO({p:[146,150],a:-4,h:0,w:[[180,146],[176,148]],f:[[186,184],[92,184]],ft:[[14,0],[-12,2]]}),PO({p:[152,153],a:-10,h:-4,w:[[182,147],[178,149]],f:[[186,184],[92,184]],ft:[[14,0],[-12,2]]})]},
+ etmollet:{T:4400,prop:'wallr',k:[PO({p:[150,112],a:20,h:-8,w:[[226,70],[222,74]],f:[[176,184],[108,184]]}),PO({p:[155,114],a:25,h:-10,w:[[226,72],[222,76]],f:[[176,184],[108,184]]})]},
+ etcobra:{T:4800,k:[PO({p:[120,182],a:65,h:-30,w:[[168,187],[164,187]],f:[[20,184],[24,184]],ft:[[-8,4],[-8,4]]}),PO({p:[120,182],a:45,h:-34,w:[[160,187],[156,187]],f:[[20,184],[24,184]],ft:[[-8,4],[-8,4]]})]},
+ etischio:{T:4800,k:[PO({p:[170,182],a:-90,h:0,w:[[160,140],[156,142]],f:[[156,96],[262,184]],ft:[[10,0],[12,0]]}),PO({p:[170,182],a:-90,h:-6,w:[[156,138],[152,140]],f:[[146,100],[262,184]],ft:[[10,0],[12,0]]})]},
+ etgenoux:{T:4600,k:[PO({p:[170,182],a:-90,h:0,w:[[152,146],[148,148]],f:[[184,132],[180,134]]}),PO({p:[170,182],a:-90,h:-6,w:[[148,144],[144,146]],f:[[176,128],[172,130]]})]}
+});
+EXD.hero={fv:1,T:1300,k:EXD.jacks.k};
+Object.keys(EXD).forEach(function(k){EXD[k].key=k});
+['etfente','etmollet','etcobra','etischio','etgenoux','hero'].forEach(function(k){EXD[k].noM=1});
+LAB.etfente=['Hanches','et cuisses',['quad','glute'],'s'];LAB.etmollet=['Mollets','(étirement)',['calf'],'s'];LAB.etcobra=['Abdos','et bas du dos',['abs','back'],'s'];
+LAB.etischio=['Arrière des','cuisses',['quad'],'s'];LAB.etgenoux=['Bas du dos','(détente)',['back','glute'],'s'];
+
 function mix(a,b,u){
   if(typeof a==='number')return a+(b-a)*u;
   var o=[];for(var i=0;i<a.length;i++)o.push(mix(a[i],b[i],u));return o;
@@ -708,13 +724,15 @@ function isVis(el){
 function loop(ts){
   if(ts-lastT>=40){
     lastT=ts;
-    var els=document.querySelectorAll('.fig[data-k]'),still=(typeof S!=='undefined'&&S.anim===false);
-    for(var i=0;i<els.length;i++){
-      var el=els[i];
-      if(!isVis(el))continue;
+    var els=document.querySelectorAll('.fig[data-k]'),still=(typeof S!=='undefined'&&S.anim===false),vis=[],vh=window.innerHeight||800,i,el;
+    /* 1) lectures groupées (évite de recalculer la mise en page à chaque figure) */
+    for(i=0;i<els.length;i++){el=els[i];var r=el.getBoundingClientRect();if(r.width>0&&r.height>0&&r.bottom>-20&&r.top<vh+20)vis.push(el)}
+    /* 2) écritures */
+    for(i=0;i<vis.length;i++){
+      el=vis[i];
       var d=EXD[el.getAttribute('data-k')];if(!d)continue;
       var svg=el.querySelector('svg'),bg=svg.querySelector('.bg'),fg=svg.querySelector('.fg');
-      var t=still?0:(el.closest('#run')?ts-RUNT0:ts),P=poseAt(d,t);
+      var inRun=!!el.closest('#run'),t=still?0:(inRun?ts-RUNT0:ts),P=poseAt(d,t);
       if(el.getAttribute('data-scn')!==String(SCN)||!bg.firstChild){bg.innerHTML=draw(P,d,t,'bg');el.setAttribute('data-scn',String(SCN))}
       fg.innerHTML=draw(P,d,t,'fg');
     }
@@ -782,7 +800,7 @@ pickScene();
 
 function plan(s,ov){
   var iv=INT[ov&&ov.i!==undefined?ov.i:S.int],st=[],n=s.ex.length,j,k;
-  if(s.stretch){s.ex.forEach(function(x){st.push({t:'cool',k:x,dur:40,round:0})});return {steps:st,rounds:1}}
+  if(s.stretch){s.ex.forEach(function(x){st.push({t:'cool',k:x,dur:s.sd||40,round:0})});return {steps:st,rounds:1}}
   var warm=S.warm,cool=S.cool,slots;
   if(ov&&ov.r)slots=ov.r*n;
   else if(S.dur!=='auto'){var budget=S.dur*60-(warm?WARM.length*30:0)-(cool?STRETCH.length*30:0);slots=Math.max(2,Math.round((budget+iv.r)/(iv.w+iv.r)))}
@@ -820,13 +838,13 @@ function progCard(){
 /* ---------- vues ---------- */
 function go(t){S.tab=t;render();window.scrollTo(0,0)}
 function render(){
-  ['train','gym','cali','track','set'].forEach(function(k){
+  ['train','gym','cali','str','track','set'].forEach(function(k){
     var b=document.getElementById('t-'+k);
     if(k===S.tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');
   });
   var a=document.getElementById('app');
   if(S.tab==='tips')S.tab='set';
-  a.innerHTML=S.tab==='train'?vTrain():S.tab==='gym'?vGym():S.tab==='cali'?vCali():S.tab==='track'?vTrack():vSet();
+  a.innerHTML=S.tab==='train'?vTrain():S.tab==='gym'?vGym():S.tab==='cali'?vCali():S.tab==='str'?vStretch():S.tab==='track'?vTrack():vSet();
 }
 function vTrain(){
   var h='<h1>Forme en 20 min</h1><p class="lead">Aucun matériel. 3 séances par semaine suffisent pour changer ton corps.</p>';
@@ -841,7 +859,8 @@ function vTrain(){
   h+='<label class="toggle"><input type="checkbox" '+(S.warm?'checked':'')+' onchange="setWarm(this.checked)"> Ajouter 2 min d’échauffement</label>';
   h+='<label class="toggle"><input type="checkbox" '+(S.cool?'checked':'')+' onchange="setCool(this.checked)"> Ajouter 2 min d’étirements à la fin</label>';
   SESS.forEach(function(s,si){
-    h+='<article class="sess"><div class="top"><div><h3>'+esc(s.name)+'</h3><p>'+esc(s.tag)+'</p></div><div class="time">'+mins(s)+' min</div></div>';
+    if(s.hide)return;
+    h+='<article class="sess"><div class="top"><div><h3>'+esc(s.name)+'</h3><p>'+esc(s.tag)+'</p></div><div class="time">'+mins(s)+' min</div></div>'+figHTML(s.ex[0]);
     h+='<button class="go" onclick="start('+si+')">Lancer la séance</button>';
     h+='<details><summary>Voir les '+s.ex.length+' exercices'+(s.stretch?'':' ('+s.rounds+' tours)')+'</summary>';
     s.ex.forEach(function(k){var e=EX[k];
@@ -1085,6 +1104,32 @@ function delLast(){
 }
 
 
+
+/* ---------- onglet étirements ---------- */
+Object.assign(EX,{
+ etfente:{n:'Fente basse (hanches)',d:'Un genou au sol, l’autre pied devant. Avance doucement le bassin, buste droit : ça étire le devant de la hanche.',e:'Coussin sous le genou.'},
+ etmollet:{n:'Mollets au mur',d:'Mains au mur, une jambe tendue derrière, talon au sol. Penche-toi doucement vers le mur.',e:''},
+ etcobra:{n:'Cobra',d:'Allongé sur le ventre, mains sous les épaules. Pousse pour lever le buste, bassin au sol, épaules basses.',e:'Reste sur les avant-bras.'},
+ etischio:{n:'Jambe tendue au plafond',d:'Sur le dos, une jambe tendue vers le haut. Tiens l’arrière de la cuisse et rapproche-la doucement.',e:'Une serviette autour du pied.'},
+ etgenoux:{n:'Genoux à la poitrine',d:'Sur le dos, ramène les genoux vers la poitrine et serre-les dans tes bras. Respire lentement.',e:''}
+});
+Object.assign(MUS,{etfente:'Étire le devant des hanches et des cuisses',etmollet:'Étire les mollets',etcobra:'Étire les abdos, assouplit le bas du dos',etischio:'Étire l’arrière des cuisses',etgenoux:'Détend le bas du dos'});
+SESS.push({id:'M',name:'Étirements du matin',tag:'Réveil en douceur, 5 min',rounds:1,stretch:true,sd:40,hide:1,ex:['cercles','etfente','etmollet','etfold','etpec','etquad','ettri']});
+SESS.push({id:'N',name:'Étirements du soir',tag:'Détente avant de dormir, 6 min',rounds:1,stretch:true,sd:50,hide:1,ex:['etgenoux','etischio','etcobra','etenfant','etfold','etpec','ettri']});
+SESS.forEach(function(s){if(s.id==='T'){s.hide=1;s.name='Après la séance';s.tag='Récupération, 3 min'}});
+function doneToday(id){var t=dkey(new Date());return load('fit:log',[]).some(function(l){return l.id===id&&dkey(new Date(l.d))===t})}
+function vStretch(){
+  var h='<h1>Étirements</h1><p class="lead">Le matin pour réveiller le corps, le soir pour relâcher le dos et mieux dormir.</p>';
+  ['M','N','T'].forEach(function(id){
+    var si=sessById(id),s=SESS[si],ok=doneToday(id);
+    h+='<article class="sess"><div class="top"><div><h3>'+esc(s.name)+'</h3><p>'+esc(s.tag)+'</p></div><div class="time">'+(ok?'Fait':mins(s)+' min')+'</div></div>'+figHTML(s.ex[1]||s.ex[0]);
+    h+='<button class="go" onclick="start('+si+')">Lancer</button><details><summary>Voir les '+s.ex.length+' étirements</summary>';
+    s.ex.forEach(function(k){var e=EX[k];h+='<div class="ex">'+figHTML(k)+'<b>'+esc(e.n)+'</b><span>'+esc(e.d)+'</span><span class="mus">'+esc(MUS[k]||'')+'</span></div>'});
+    h+='</details></article>';
+  });
+  h+='<p class="small" style="margin-top:14px">Étire-toi sans à-coups, jusqu’à une tension légère, jamais jusqu’à la douleur. Respire lentement.</p>';
+  return h;
+}
 
 /* =====================================================
    ONGLET SALLE ET CALISTHÉNIE
